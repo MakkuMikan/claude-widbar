@@ -1,0 +1,29 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SystemWidget.WidBar.ExtensionApp", "SystemWidget.WidBar.ExtensionApp\SystemWidget.WidBar.ExtensionApp.csproj", "{10AD9B1C-35BF-430A-8276-8E05C5BF9388}"
+EndProject
+Project("{C7167F0D-BC9F-4E6E-AFE1-012C56B48DB5}") = "SystemWidget.WidBar (Package)", "SystemWidget.WidBar (Package)\SystemWidget.WidBar (Package).wapproj", "{6E156EA0-0194-4931-AB63-3AC0EFF4F19F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{10AD9B1C-35BF-430A-8276-8E05C5BF9388}.Debug|x64.ActiveCfg = Debug|x64
+		{10AD9B1C-35BF-430A-8276-8E05C5BF9388}.Debug|x64.Build.0 = Debug|x64
+		{10AD9B1C-35BF-430A-8276-8E05C5BF9388}.Release|x64.ActiveCfg = Release|x64
+		{10AD9B1C-35BF-430A-8276-8E05C5BF9388}.Release|x64.Build.0 = Release|x64
+		{6E156EA0-0194-4931-AB63-3AC0EFF4F19F}.Debug|x64.ActiveCfg = Debug|x64
+		{6E156EA0-0194-4931-AB63-3AC0EFF4F19F}.Debug|x64.Build.0 = Debug|x64
+		{6E156EA0-0194-4931-AB63-3AC0EFF4F19F}.Debug|x64.Deploy.0 = Debug|x64
+		{6E156EA0-0194-4931-AB63-3AC0EFF4F19F}.Release|x64.ActiveCfg = Release|x64
+		{6E156EA0-0194-4931-AB63-3AC0EFF4F19F}.Release|x64.Build.0 = Release|x64
+		{6E156EA0-0194-4931-AB63-3AC0EFF4F19F}.Release|x64.Deploy.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

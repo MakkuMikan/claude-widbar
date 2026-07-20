@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SystemWidget.WidBar.ExtensionApp</RootNamespace>
+    <AssemblyName>SystemWidget.WidBar.ExtensionApp</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+  </PropertyGroup>
+
+  <!-- These properties feed the WidBar SDK build target, which writes
+       obj\widbar\plugin.json at build time. The packaging project picks that
+       file up, so id/name/version only live here. -->
+  <PropertyGroup>
+    <WidBarPluginId>io.github.10tonchan.systemwidget</WidBarPluginId>
+    <WidBarPluginName>System Widget</WidBarPluginName>
+    <WidBarPluginDescription>CPU、GPU、Claude Code の使用状況をタスクバーに表示</WidBarPluginDescription>
+    <WidBarPluginCategory>Utility</WidBarPluginCategory>
+    <WidBarPluginVersion>1.0.7</WidBarPluginVersion>
+    <WidBarPluginPreviewWidth>456</WidBarPluginPreviewWidth>
+    <WidBarPluginConfigurable>false</WidBarPluginConfigurable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.0" />
+    <PackageReference Include="WidBar.SDK" Version="1.2.0" />
+  </ItemGroup>
+
+</Project>

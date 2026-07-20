@@ -1,0 +1,19 @@
+# Local IDE state
+.vs/
+
+# Build and packaging outputs
+**/bin/
+**/obj/
+**/AppPackages/
+**/BundleArtifacts/
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.appxsym
+
+# Local signing material (never publish these)
+*.pfx
+*.cer
+*.pvk
+*.key
