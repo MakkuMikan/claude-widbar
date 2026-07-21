@@ -26,7 +26,7 @@ public sealed class MainPlugin : WidgetPluginBase
     private DispatcherTimer? _previewTimer;
     private DispatcherTimer? _flyoutTimer;
 
-    public override string Id => "io.github.10tonchan.systemwidget";
+    public override string Id => "io.github.10tonchan.claudecodexwidbar";
     public override string Name => "System Widget";
     public override string Description => "CPU、GPU、Claude Code の使用状況をタスクバーに表示";
     public override WidgetCategory Category => WidgetCategory.Utility;

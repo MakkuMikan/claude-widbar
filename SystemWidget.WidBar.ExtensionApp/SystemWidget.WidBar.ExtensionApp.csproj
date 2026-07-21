@@ -21,7 +21,7 @@
        obj\widbar\plugin.json at build time. The packaging project picks that
        file up, so id/name/version only live here. -->
   <PropertyGroup>
-    <WidBarPluginId>io.github.10tonchan.systemwidget</WidBarPluginId>
+    <WidBarPluginId>io.github.10tonchan.claudecodexwidbar</WidBarPluginId>
     <WidBarPluginName>System Widget</WidBarPluginName>
     <WidBarPluginDescription>CPU、GPU、Claude Code の使用状況をタスクバーに表示</WidBarPluginDescription>
     <WidBarPluginCategory>Utility</WidBarPluginCategory>

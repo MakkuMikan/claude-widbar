@@ -44,12 +44,12 @@
         <uap3:Extension Category="windows.appExtension">
           <uap3:AppExtension
             Name="com.widbar.widget"
-            Id="systemwidget"
+            Id="claudecodexwidbar"
             PublicFolder="Public"
             DisplayName="System Widget"
             Description="CPU、GPU、Claude Code の使用状況をタスクバーに表示">
             <uap3:Properties>
-              <WidBarPluginId>io.github.10tonchan.systemwidget</WidBarPluginId>
+              <WidBarPluginId>io.github.10tonchan.claudecodexwidbar</WidBarPluginId>
               <WidBarSdkVersion>2</WidBarSdkVersion>
             </uap3:Properties>
           </uap3:AppExtension>
