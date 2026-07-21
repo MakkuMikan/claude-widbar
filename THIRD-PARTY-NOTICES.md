@@ -15,3 +15,10 @@ the restored package versions.
 
 WidBar itself is a separate application and is not bundled by this source-only
 repository.
+
+## Code derived from other projects
+
+The Claude usage retrieval code (`SystemWidget.WidBar.ExtensionApp/Services/CredentialService.cs`
+and `UsageApiService.cs`) is based on
+[sr-kai/claudeusagewin](https://github.com/sr-kai/claudeusagewin), licensed under
+the MIT License. Copyright (c) sr-kai and contributors.

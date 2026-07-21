@@ -4,6 +4,10 @@ Windows のタスクバーに CPU、RAM、GPU、VRAM、Claude Code、Codex の�
 
 このディレクトリは **ソースコードのみ**を公開する想定です。MSIXバイナリ、証明書、認証情報、利用ログは含みません。
 
+> **Disclaimer**: This is an independent, community-built project. It is **not** created, endorsed, or officially supported by Anthropic. "Claude" and "Anthropic" are trademarks of Anthropic, PBC.
+>
+> This project reads Claude Code usage data via `https://api.anthropic.com/api/oauth/usage`, the same undocumented OAuth endpoint the Claude Code CLI itself calls to power its `/usage` command. It is not part of Anthropic's public API and Anthropic may change or remove it without notice, which could break this feature at any time. The implementation is based on [sr-kai/claudeusagewin](https://github.com/sr-kai/claudeusagewin) (MIT license) — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
 ## 表示とデータの扱い
 
 すべての計測はPC内で行い、ウィジェット自身はデータを外部送信しません。
@@ -16,8 +20,6 @@ Windows のタスクバーに CPU、RAM、GPU、VRAM、Claude Code、Codex の�
 | Codex | `~/.codex/sessions` のローカルJSONL | Codexが記録した `rate_limits` を表示 |
 
 Claude Code の認証情報が読めない、または Codex のログにアクセスできない場合は `--` を表示します。
-
-⚠️ Claude Code の利用状況取得は Anthropic 非公開の API を利用しています。Anthropic の裁量で変更・廃止される可能性があります。
 
 ## 必要環境
 
@@ -54,8 +56,9 @@ Visual StudioでのDeploy、またはMSIXをローカル配布する場合は、
 
 ## プライバシーとセキュリティ
 
-- 認証トークンや資格情報を送信・保存しません。
-- Claude Code / Codex のローカルログは読み取り専用です。
+- `~/.claude/.credentials.json` は読み取り専用です。Claude Code 本体のファイルには一切書き込みません。
+- OAuth アクセストークンが期限切れの場合のみ refresh token で更新し、更新結果は `%LOCALAPPDATA%\system_widget\claude_token.json`（このウィジェット専用のローカルキャッシュ）にのみ保存します。外部へは一切送信しません。
+- Claude Code / Codex のローカルログ・認証情報は読み取り専用です。
 - ローカルビルドで生成されるMSIX、証明書、`bin/`、`obj/` はGit管理に含めません。
 
 ## ライセンス
