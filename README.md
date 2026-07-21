@@ -12,10 +12,12 @@ Windows のタスクバーに CPU、RAM、GPU、VRAM、Claude Code、Codex の�
 | --- | --- | --- |
 | CPU / RAM | WindowsシステムAPI | 1秒ごとに更新 |
 | GPU / VRAM | Windows PDH / DXGI | 対応ドライバーが必要 |
-| Claude Code | `~/.claude/projects` のローカルJSONL | ローカルログからの推定。公式利用枠ではありません |
+| Claude Code | Claude Code CLI と同じ非公開 API (`/api/oauth/usage`) | `~/.claude/.credentials.json` の OAuth トークンで取得。claude.ai の「プラン使用制限」画面と同じ値 |
 | Codex | `~/.codex/sessions` のローカルJSONL | Codexが記録した `rate_limits` を表示 |
 
-Claude Code と Codex のログにアクセスできない、または該当データがない場合は `--` を表示します。
+Claude Code の認証情報が読めない、または Codex のログにアクセスできない場合は `--` を表示します。
+
+⚠️ Claude Code の利用状況取得は Anthropic 非公開の API を利用しています。Anthropic の裁量で変更・廃止される可能性があります。
 
 ## 必要環境
 

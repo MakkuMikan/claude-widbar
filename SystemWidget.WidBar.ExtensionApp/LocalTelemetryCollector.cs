@@ -2,6 +2,8 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Diagnostics;
 using Microsoft.Win32;
+using SystemWidget.WidBar.ExtensionApp.Models;
+using SystemWidget.WidBar.ExtensionApp.Services;
 
 namespace SystemWidget.WidBar.ExtensionApp;
 
@@ -13,6 +15,9 @@ internal sealed class LocalTelemetryCollector
     private List<PerformanceCounter>? _gpuCounters;
     private List<PerformanceCounter>? _vramCounters;
     private int _emptyGpuSamples;
+    // Claude usage は 180 秒に 1 回、背景で更新して最終値を同期取得する。
+    // 毎秒 Sample() から呼ばれるため、ここで直接 HTTP を叩くと 429 に落ちる。
+    private readonly ClaudeUsageTracker _claudeTracker = new();
     // DXGI は実機で RX 9070 XT の専用VRAM 15.8GB を返すことを単体検証済み。
     // 取得不能時も GPU 使用率の収集は継続する。
     private readonly double _vramTotalGb = ReadDxgiVramBytes() / 1073741824d;
@@ -49,36 +54,30 @@ internal sealed class LocalTelemetryCollector
         };
     }
 
-    private static MainPlugin.ClaudeStatus? ReadClaude()
+    private MainPlugin.ClaudeStatus? ReadClaude()
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects");
-        if (!Directory.Exists(root)) return null;
-        var now = DateTimeOffset.UtcNow;
-        // config.json と同じく、週次境界は金曜 10:59（ローカル時刻）。
-        var localNow = DateTimeOffset.Now;
-        var daysSinceFriday = (7 + (int)localNow.DayOfWeek - (int)DayOfWeek.Friday) % 7;
-        var localStart = localNow.Date.AddDays(-daysSinceFriday).AddHours(10).AddMinutes(59);
-        var weeklyStart = new DateTimeOffset(localStart, TimeZoneInfo.Local.GetUtcOffset(localStart)).ToUniversalTime();
-        if (weeklyStart > now) weeklyStart = weeklyStart.AddDays(-7);
-        var events = new List<(DateTimeOffset time, long tokens)>();
-        try
+        // credentials 自体が無いユーザは "--" 表示 (Claude Code 未ログイン等)。
+        if (!_claudeTracker.CredentialsExist) return null;
+
+        // 背景で 180 秒キャッシュを更新。初回は latest が null なので --。
+        _claudeTracker.EnsureFresh();
+        var usage = _claudeTracker.Latest;
+        if (usage == null) return null;
+
+        return new MainPlugin.ClaudeStatus
         {
-            foreach (var file in Directory.EnumerateFiles(root, "*.jsonl", SearchOption.AllDirectories).Where(p => File.GetLastWriteTimeUtc(p) >= weeklyStart.AddHours(-5).UtcDateTime))
-            foreach (var line in File.ReadLines(file))
-            {
-                if (!line.Contains("\"usage\"")) continue;
-                using var doc = JsonDocument.Parse(line); var obj = doc.RootElement;
-                if (!obj.TryGetProperty("timestamp", out var raw) || !DateTimeOffset.TryParse(raw.GetString(), out var time) || !obj.TryGetProperty("message", out var msg) || !msg.TryGetProperty("usage", out var usage)) continue;
-                if (msg.TryGetProperty("model", out var model) && model.GetString() == "<synthetic>") continue;
-                var tokens = new[] { "input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens" }.Sum(k => usage.TryGetProperty(k, out var n) ? n.GetInt64() : 0);
-                if (tokens > 0) events.Add((time, tokens));
-            }
-        }
-        catch (Exception) { return null; }
-        var weekTokens = events.Where(e => e.time >= weeklyStart).Sum(e => e.tokens);
-        var active = events.Where(e => e.time >= now.AddHours(-5)).ToList();
-        var sessionTokens = active.Sum(e => e.tokens);
-        return new MainPlugin.ClaudeStatus { SessionPercent = active.Count == 0 ? null : Math.Min(100, sessionTokens * 100d / 230000000), WeekPercent = Math.Min(100, weekTokens * 100d / 4100000000), SessionSecondsRemaining = active.Count == 0 ? null : Math.Max(0, (int)(active.Max(e => e.time).AddHours(5) - now).TotalSeconds), WeekSecondsRemaining = Math.Max(0, (int)(weeklyStart.AddDays(7) - now.UtcDateTime).TotalSeconds) };
+            SessionPercent = usage.FiveHour?.Utilization,
+            WeekPercent = usage.SevenDay?.Utilization,
+            SessionSecondsRemaining = RemainingSeconds(usage.FiveHour?.ResetsAt),
+            WeekSecondsRemaining = RemainingSeconds(usage.SevenDay?.ResetsAt),
+        };
+    }
+
+    private static int? RemainingSeconds(DateTimeOffset? resetsAt)
+    {
+        if (resetsAt is null) return null;
+        var remaining = (resetsAt.Value - DateTimeOffset.UtcNow).TotalSeconds;
+        return Math.Max(0, (int)remaining);
     }
 
     private MainPlugin.GpuStatus? ReadGpu()

@@ -65,7 +65,7 @@ public sealed class MainPlugin : WidgetPluginBase
             ("memory", "RAM", ColorHelper.FromArgb(255, 207, 119, 255)),
             ("gpu", "GPU", ColorHelper.FromArgb(255, 95, 205, 107)),
             ("vram", "VRAM", ColorHelper.FromArgb(255, 84, 160, 255)),
-            ("claude5h", "CLAUDE", ColorHelper.FromArgb(255, 244, 164, 79)),
+            ("claude5h", "CC 5H", ColorHelper.FromArgb(255, 244, 164, 79)),
             ("claudeWeek", "CC WEEK", ColorHelper.FromArgb(255, 244, 164, 79)),
             ("codex5h", "CODEX", ColorHelper.FromArgb(255, 91, 180, 255)),
         };
