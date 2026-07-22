@@ -67,7 +67,7 @@ public sealed class MainPlugin : WidgetPluginBase
             ("vram", "VRAM", ColorHelper.FromArgb(255, 84, 160, 255)),
             ("claude5h", "CC 5H", ColorHelper.FromArgb(255, 244, 164, 79)),
             ("claudeWeek", "CC WEEK", ColorHelper.FromArgb(255, 244, 164, 79)),
-            ("codex5h", "CODEX", ColorHelper.FromArgb(255, 91, 180, 255)),
+            ("codexWeek", "CODEX WK", ColorHelper.FromArgb(255, 91, 180, 255)),
         };
         for (var i = 0; i < tiles.Length; i++)
         {
@@ -210,7 +210,7 @@ public sealed class MainPlugin : WidgetPluginBase
         UpdateMetric("vram", snapshot?.Gpu?.VramPercent);
         UpdateMetric("claude5h", snapshot?.Claude?.SessionPercent);
         UpdateMetric("claudeWeek", snapshot?.Claude?.WeekPercent);
-        UpdateMetric("codex5h", snapshot?.Codex?.ShortPercent);
+        UpdateMetric("codexWeek", snapshot?.Codex?.WeekPercent);
     }
 
     private void UpdateFlyout()

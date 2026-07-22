@@ -168,13 +168,16 @@ internal sealed class LocalTelemetryCollector
         foreach (var counter in counters) counter.Dispose();
     }
 
+    // 週次判定のしきい値。Codex の週次枠は window_minutes=10080 (7日)。
+    private const long WeekWindowThresholdMinutes = 1440;
+
     private static MainPlugin.CodexStatus? ReadCodex()
     {
         var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "sessions");
         if (!Directory.Exists(root)) return null;
         DateTimeOffset? newest = null;
-        double? primary = null, secondary = null;
-        long? primaryReset = null, secondaryReset = null;
+        double? shortUsed = null, weekUsed = null;
+        long? shortReset = null, weekReset = null;
         try
         {
             foreach (var path in Directory.EnumerateFiles(root, "rollout-*.jsonl", SearchOption.AllDirectories)
@@ -184,7 +187,10 @@ internal sealed class LocalTelemetryCollector
                 // 他セッションの正しい token_count を捨てない。
                 try
                 {
-                    foreach (var line in File.ReadLines(path))
+                    // アクティブセッションのファイルは Codex 自身が書き込み用に開いたままなので、
+                    // File.ReadLines 既定の FileShare.Read だけでは共有違反 (IOException) になる。
+                    // 書き込み共有も許可して開かないと、直近のセッションの値を一切拾えない。
+                    foreach (var line in ReadLinesShared(path))
                     {
                         if (!line.Contains("\"rate_limits\"")) continue;
                         using var doc = JsonDocument.Parse(line);
@@ -193,8 +199,9 @@ internal sealed class LocalTelemetryCollector
                         if (newest is { } previous && ts <= previous) continue;
                         if (!rootEl.TryGetProperty("payload", out var payload) || !payload.TryGetProperty("type", out var type) || type.GetString() != "token_count" || !payload.TryGetProperty("rate_limits", out var limits)) continue;
                         newest = ts;
-                        (primary, primaryReset) = ReadWindow(limits, "primary");
-                        (secondary, secondaryReset) = ReadWindow(limits, "secondary");
+                        // "primary"/"secondary" は短期/週次のどちらに対応するかがプラン次第で入れ替わるため、
+                        // window_minutes の実値 (週次=10080分/7日) で振り分ける。名前を信用しない。
+                        (shortUsed, shortReset, weekUsed, weekReset) = AssignWindows(ReadWindow(limits, "primary"), ReadWindow(limits, "secondary"));
                     }
                 }
                 catch (Exception) { }
@@ -202,14 +209,36 @@ internal sealed class LocalTelemetryCollector
         }
         catch (Exception) { return null; }
         if (newest is null) return null;
-        return new MainPlugin.CodexStatus { ShortPercent = primary, WeekPercent = secondary, ShortSecondsRemaining = SecondsRemaining(primaryReset), WeekSecondsRemaining = SecondsRemaining(secondaryReset) };
+        return new MainPlugin.CodexStatus { ShortPercent = shortUsed, WeekPercent = weekUsed, ShortSecondsRemaining = SecondsRemaining(shortReset), WeekSecondsRemaining = SecondsRemaining(weekReset) };
     }
 
-    private static (double? used, long? reset) ReadWindow(JsonElement limits, string name)
+    private static (double? shortUsed, long? shortReset, double? weekUsed, long? weekReset) AssignWindows(
+        (double? used, long? reset, long? windowMinutes) a, (double? used, long? reset, long? windowMinutes) b)
     {
-        if (!limits.TryGetProperty(name, out var window) || window.ValueKind != JsonValueKind.Object) return (null, null);
+        if (a.windowMinutes is { } aw && b.windowMinutes is { } bw)
+            return aw >= bw ? (b.used, b.reset, a.used, a.reset) : (a.used, a.reset, b.used, b.reset);
+        if (a.windowMinutes is { } aw2)
+            return aw2 >= WeekWindowThresholdMinutes ? (b.used, b.reset, a.used, a.reset) : (a.used, a.reset, b.used, b.reset);
+        if (b.windowMinutes is { } bw2)
+            return bw2 >= WeekWindowThresholdMinutes ? (a.used, a.reset, b.used, b.reset) : (b.used, b.reset, a.used, a.reset);
+        // window_minutes が両方取れない場合は素直に primary=短期, secondary=週次 にフォールバック
+        return (a.used, a.reset, b.used, b.reset);
+    }
+
+    private static IEnumerable<string> ReadLinesShared(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        string? line;
+        while ((line = reader.ReadLine()) is not null) yield return line;
+    }
+
+    private static (double? used, long? reset, long? windowMinutes) ReadWindow(JsonElement limits, string name)
+    {
+        if (!limits.TryGetProperty(name, out var window) || window.ValueKind != JsonValueKind.Object) return (null, null, null);
         return (window.TryGetProperty("used_percent", out var used) ? used.GetDouble() : null,
-                window.TryGetProperty("resets_at", out var reset) ? reset.GetInt64() : null);
+                window.TryGetProperty("resets_at", out var reset) ? reset.GetInt64() : null,
+                window.TryGetProperty("window_minutes", out var wm) ? wm.GetInt64() : null);
     }
 
     private static int? SecondsRemaining(long? epoch) => epoch is null ? null : Math.Max(0, (int)(DateTimeOffset.FromUnixTimeSeconds(epoch.Value) - DateTimeOffset.UtcNow).TotalSeconds);
