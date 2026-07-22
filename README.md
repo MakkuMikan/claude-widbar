@@ -1,50 +1,52 @@
 # System Widget for WidBar
 
-Windows のタスクバーに CPU、RAM、GPU、VRAM、Claude Code、Codex のローカル使用状況を表示する [WidBar](https://github.com/andelby/widbar) ウィジェットです。
+*[日本語](README.ja.md)*
 
-このディレクトリは **ソースコードのみ**を公開する想定です。MSIXバイナリ、証明書、認証情報、利用ログは含みません。
+A [WidBar](https://github.com/andelby/widbar) widget for the Windows taskbar that shows local CPU, RAM, GPU, VRAM, Claude Code, and Codex usage.
+
+This directory is meant to publish **source code only**. No MSIX binaries, certificates, credentials, or usage logs are included.
 
 > **Disclaimer**: This is an independent, community-built project. It is **not** created, endorsed, or officially supported by Anthropic. "Claude" and "Anthropic" are trademarks of Anthropic, PBC.
 >
 > This project reads Claude Code usage data via `https://api.anthropic.com/api/oauth/usage`, the same undocumented OAuth endpoint the Claude Code CLI itself calls to power its `/usage` command. It is not part of Anthropic's public API and Anthropic may change or remove it without notice, which could break this feature at any time. The implementation is based on [sr-kai/claudeusagewin](https://github.com/sr-kai/claudeusagewin) (MIT license) — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-## 表示とデータの扱い
+## What it shows, and where the data comes from
 
-すべての計測はPC内で行い、ウィジェット自身はデータを外部送信しません。
+All measurement happens on your PC. The widget itself never sends data anywhere.
 
-| 項目 | 取得元 | 補足 |
+| Item | Source | Notes |
 | --- | --- | --- |
-| CPU / RAM | WindowsシステムAPI | 1秒ごとに更新 |
-| GPU / VRAM | Windows PDH / DXGI | 対応ドライバーが必要 |
-| Claude Code | Claude Code CLI と同じ非公開 API (`/api/oauth/usage`) | `~/.claude/.credentials.json` の OAuth トークンで取得。claude.ai の「プラン使用制限」画面と同じ値 |
-| Codex | `~/.codex/sessions` のローカルJSONL | Codexが記録した `rate_limits` を表示 |
+| CPU / RAM | Windows system APIs | Refreshed every second |
+| GPU / VRAM | Windows PDH / DXGI | Requires a supported driver |
+| Claude Code | The same undocumented API the Claude Code CLI uses (`/api/oauth/usage`) | Fetched with the OAuth token in `~/.claude/.credentials.json`. Same figures as the "plan usage limits" screen on claude.ai |
+| Codex | Local JSONL under `~/.codex/sessions` | Shows the `rate_limits` Codex itself records |
 
-Claude Code の認証情報が読めない、または Codex のログにアクセスできない場合は `--` を表示します。
+If Claude Code credentials can't be read, or the Codex logs aren't accessible, the widget shows `--`.
 
-## 必要環境
+## Requirements
 
-- Windows 11（x64 または ARM64）
+- Windows 11 (x64 or ARM64)
 - [WidBar](https://github.com/andelby/widbar)
-- Visual Studio 2022（Desktop development with .NET、Windows App SDK とWindows SDK）
+- Visual Studio 2022 (Desktop development with .NET, Windows App SDK and Windows SDK)
 - .NET 8 SDK
 
-## ローカルでビルド・登録する
+## Build and register locally
 
-1. このディレクトリを取得し、`SystemWidget.WidBar.sln` を Visual Studio 2022 で開きます。
-2. `Debug | x64` を選択し、`SystemWidget.WidBar (Package)` をビルドします。
-3. 開発用のルーズレイアウトを登録します。管理者PowerShellは不要ですが、Windowsの開発者モードが必要になる場合があります。
+1. Get this directory and open `SystemWidget.WidBar.sln` in Visual Studio 2022.
+2. Select `Debug | x64` and build `SystemWidget.WidBar (Package)`.
+3. Register the development loose layout. An elevated PowerShell isn't required, but Windows Developer Mode may need to be enabled.
 
 ```powershell
 Add-AppxPackage -Register ".\SystemWidget.WidBar (Package)\bin\x64\Debug\AppxManifest.xml"
 ```
 
-4. WidBar を起動し、カタログから **System Widget** をタスクバーに追加します。
+4. Launch WidBar and add **System Widget** to the taskbar from the catalog.
 
-Visual StudioでのDeploy、またはMSIXをローカル配布する場合は、Windowsが信頼する署名が必要です。ソースをGitHubで公開するだけなら署名やMicrosoft Store登録は不要です。開発用の自己署名証明書の扱いは、Microsoftの[MSIX署名ガイド](https://learn.microsoft.com/windows/msix/package/create-certificate-package-signing)を参照してください。
+Deploying from Visual Studio, or distributing the MSIX locally, requires a signature Windows trusts. Just publishing the source on GitHub needs neither signing nor a Microsoft Store listing. See Microsoft's [MSIX signing guide](https://learn.microsoft.com/windows/msix/package/create-certificate-package-signing) for how to handle a development self-signed certificate.
 
-## 開発時の検証
+## Verifying changes during development
 
-パッケージプロジェクトをビルドした後、WidBarを再起動して値を実画面で確認してください。ウィジェット実行中に `Rebuild` すると出力ファイルがロックされるため、その場合はWidBarを終了してからビルドし、完了後に起動し直します。GPU/VRAMや利用量の修正では、既存のローカル収集値とWidBar表示値を同時点で照合します。
+After building the package project, restart WidBar and check the values on screen. `Rebuild` while the widget is running will fail because the output files are locked — in that case, quit WidBar first, build, then relaunch it. When fixing GPU/VRAM or usage figures, cross-check the widget's displayed value against the raw local reading at the same point in time.
 
 ```powershell
 & "C:\Program Files\Microsoft Visual Studio\2022\Community\Msbuild\Current\Bin\amd64\MSBuild.exe" `
@@ -52,19 +54,21 @@ Visual StudioでのDeploy、またはMSIXをローカル配布する場合は、
   /p:Configuration=Debug /p:Platform=x64 /restore
 ```
 
-パッケージプロジェクトは、WidBar SDKが生成する `plugin.json` をビルドごとにパッケージの `Public/` へ同期します。IDや表示名を変更する場合は、手編集した `plugin.json` を置かず、`SystemWidget.WidBar.ExtensionApp.csproj` の `WidBarPlugin*` プロパティを変更してください。
+If the tiles still show stale values after a rebuild, don't trust a "Build succeeded" message alone — MSBuild's incremental build has been observed to skip recompiling the extension project and repackage stale binaries. Force a clean rebuild (delete `bin`/`obj`, or pass `/t:Rebuild`) and reconfirm.
 
-## プライバシーとセキュリティ
+The package project syncs the `plugin.json` generated by the WidBar SDK into the package's `Public/` folder on every build. If you need to change the ID or display name, don't hand-edit that generated `plugin.json` — change the `WidBarPlugin*` properties in `SystemWidget.WidBar.ExtensionApp.csproj` instead.
 
-- `~/.claude/.credentials.json` は読み取り専用です。Claude Code 本体のファイルには一切書き込みません。
-- OAuth アクセストークンが期限切れの場合のみ refresh token で更新し、更新結果は `%LOCALAPPDATA%\system_widget\claude_token.json`（このウィジェット専用のローカルキャッシュ）にのみ保存します。外部へは一切送信しません。
-- Claude Code / Codex のローカルログ・認証情報は読み取り専用です。
-- ローカルビルドで生成されるMSIX、証明書、`bin/`、`obj/` はGit管理に含めません。
+## Privacy and security
 
-## ライセンス
+- `~/.claude/.credentials.json` is read-only. Nothing is ever written back to Claude Code's own files.
+- The OAuth access token is refreshed only when it has expired, using the refresh token; the result is cached solely in `%LOCALAPPDATA%\system_widget\claude_token.json` (a cache local to this widget). Nothing is sent anywhere else.
+- Claude Code / Codex local logs and credentials are accessed read-only.
+- MSIX packages, certificates, `bin/`, and `obj/` produced by local builds are excluded from Git.
 
-本ソースは [GPL-3.0-only](LICENSE) です。直接依存するNuGetパッケージのライセンスは [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) を参照してください。
+## License
 
-## 現在の配布方針
+This source is licensed under [GPL-3.0-only](LICENSE). See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the licenses of directly-depended NuGet packages.
 
-GitHubでのソース公開を対象としています。署名済みMSIXの公開配布、Microsoft Store掲載、商用コード署名証明書の取得は、このリリースには含めません。
+## Current distribution policy
+
+This release targets publishing source on GitHub. Signed MSIX distribution, a Microsoft Store listing, and a commercial code-signing certificate are all out of scope for now.
