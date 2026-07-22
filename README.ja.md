@@ -10,6 +10,16 @@ Windows のタスクバーに CPU、RAM、GPU、VRAM、Claude Code、Codex の�
 >
 > This project reads Claude Code usage data via `https://api.anthropic.com/api/oauth/usage`, the same undocumented OAuth endpoint the Claude Code CLI itself calls to power its `/usage` command. It is not part of Anthropic's public API and Anthropic may change or remove it without notice, which could break this feature at any time. The implementation is based on [sr-kai/claudeusagewin](https://github.com/sr-kai/claudeusagewin) (MIT license) — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
+## スクリーンショット
+
+タスクバーのタイル表示：
+
+![CPU・RAM・GPU・VRAM・Claude Code・Codexの使用率を示すタスクバーのタイル](docs/screenshot-taskbar.png)
+
+クリックすると、各枠のリセットまでの残り時間も含めた詳細パネルが開きます：
+
+![CPU・メモリ・GPU・VRAM・Claude Code・Codexの詳細な使用状況を示すフライアウトパネル](docs/screenshot-flyout.png)
+
 ## 表示とデータの扱い
 
 すべての計測はPC内で行い、ウィジェット自身はデータを外部送信しません。

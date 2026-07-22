@@ -10,6 +10,16 @@ This directory is meant to publish **source code only**. No MSIX binaries, certi
 >
 > This project reads Claude Code usage data via `https://api.anthropic.com/api/oauth/usage`, the same undocumented OAuth endpoint the Claude Code CLI itself calls to power its `/usage` command. It is not part of Anthropic's public API and Anthropic may change or remove it without notice, which could break this feature at any time. The implementation is based on [sr-kai/claudeusagewin](https://github.com/sr-kai/claudeusagewin) (MIT license) — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
+## Screenshots
+
+The taskbar tile strip:
+
+![Taskbar tiles showing CPU, RAM, GPU, VRAM, Claude Code, and Codex usage percentages](docs/screenshot-taskbar.png)
+
+Clicking it opens a flyout with the same figures plus remaining time until each limit resets:
+
+![Flyout panel with detailed CPU, memory, GPU, VRAM, Claude Code, and Codex usage figures](docs/screenshot-flyout.png)
+
 ## What it shows, and where the data comes from
 
 All measurement happens on your PC. The widget itself never sends data anywhere.
