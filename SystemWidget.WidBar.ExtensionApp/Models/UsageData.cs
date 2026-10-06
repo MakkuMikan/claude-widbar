@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 namespace SystemWidget.WidBar.ExtensionApp.Models;
 
 /// <summary>
-/// Claude Code の <c>/api/oauth/usage</c> レスポンス。
-/// フィールド構成は Claude Code CLI が実装している undocumented endpoint に依存する。
+/// Response from Claude Code's <c>/api/oauth/usage</c>.
+/// The field layout depends on the undocumented endpoint the Claude Code CLI uses.
 /// </summary>
 internal sealed class UsageData
 {
@@ -26,7 +26,7 @@ internal sealed class UsageData
     [JsonPropertyName("extra_usage")]
     public ExtraUsageData? ExtraUsage { get; set; }
 
-    /// <summary>週次 Sonnet 系。新旧フィールド名の両対応。</summary>
+    /// <summary>Weekly Sonnet window. Supports both the old and new field names.</summary>
     public UsageWindow? Sonnet => SevenDaySonnet ?? SonnetOnly;
 }
 
@@ -51,7 +51,7 @@ internal sealed class ExtraUsageData
     public double? UsedCredits { get; set; }
 }
 
-/// <summary>Claude Code の <c>~/.claude/.credentials.json</c> の中身。</summary>
+/// <summary>Contents of Claude Code's <c>~/.claude/.credentials.json</c>.</summary>
 internal sealed class CredentialsFile
 {
     [JsonPropertyName("claudeAiOauth")]

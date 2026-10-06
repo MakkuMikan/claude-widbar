@@ -8,9 +8,9 @@ using SystemWidget.WidBar.ExtensionApp.Models;
 namespace SystemWidget.WidBar.ExtensionApp.Services;
 
 /// <summary>
-/// Claude Code の undocumented <c>/api/oauth/usage</c> エンドポイントから利用状況を取得する。
-/// <para>Claude Code CLI 本体と同じヘッダ (<c>User-Agent: claude-code/&lt;version&gt;</c> と
-/// <c>anthropic-beta: oauth-2025-04-20</c>) を必ず付ける。付け忘れると 429 バケット行き。</para>
+/// Fetches usage from Claude Code's undocumented <c>/api/oauth/usage</c> endpoint.
+/// <para>Always sends the same headers as the Claude Code CLI (<c>User-Agent: claude-code/&lt;version&gt;</c> and
+/// <c>anthropic-beta: oauth-2025-04-20</c>). Leaving them off lands requests in the 429 bucket.</para>
 /// </summary>
 internal static class UsageApiService
 {
@@ -21,17 +21,17 @@ internal static class UsageApiService
 
     private const string UsageApiUrl = "https://api.anthropic.com/api/oauth/usage";
 
-    // 429 / 5xx で最大この回数まで指数バックオフで再試行する (1s, 2s, 4s, 8s, 16s)。
+    // On 429 / 5xx, retry up to this many times with exponential backoff (1s, 2s, 4s, 8s, 16s).
     private const int MaxRetries = 5;
 
-    // `claude --version` を叩けなかった場合のフォールバック UA バージョン。
-    // Anthropic の bucket 判定に使われるので、実際の CC 版に近い数字を置く。
+    // Fallback User-Agent version if `claude --version` can't be run.
+    // Anthropic uses it for bucketing, so keep it close to a real Claude Code version.
     private const string FallbackVersion = "2.1.100";
 
     private static string? _cachedVersion;
 
     /// <summary>
-    /// 利用状況を取得。credentials が無い / refresh 失効 / 429 継続などで取れなければ null。
+    /// Fetches usage. Returns null if it can't (no credentials, dead refresh token, persistent 429s, etc.).
     /// </summary>
     public static async Task<UsageData?> GetUsageAsync()
     {
@@ -66,8 +66,8 @@ internal static class UsageApiService
                 var body = await response.Content.ReadAsStringAsync();
                 Debug.WriteLine($"UsageApiService HTTP {status} attempt {attempt + 1}/{MaxRetries + 1}: {body}");
 
-                // 429 / 5xx は指数バックオフで再試行。それ以外 (401 期限切れ等) はもう一度 refresh を
-                // 走らせても状況変わらないので即 null 返す。次回 tick で CredentialService が再挑戦する。
+                // Retry 429 / 5xx with exponential backoff. Anything else (e.g. 401 expired) won't change by
+                // refreshing again right now, so return null. CredentialService tries again on the next tick.
                 if ((status == 429 || status >= 500) && attempt < MaxRetries)
                 {
                     var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
@@ -88,7 +88,7 @@ internal static class UsageApiService
             }
             catch (JsonException ex)
             {
-                // レスポンス構造が変わっていたら retry しても直らないので即あきらめる。
+                // If the response shape has changed, retrying won't help, so give up immediately.
                 Debug.WriteLine($"UsageApiService JSON parse failed: {ex.Message}");
                 return null;
             }
@@ -104,8 +104,8 @@ internal static class UsageApiService
     private static string GetClaudeCodeVersion()
     {
         if (_cachedVersion != null) return _cachedVersion;
-        // cmd.exe /c 経由で叩く。生の "claude" は CreateProcess が PATHEXT を無視して
-        // npm 版 .cmd shim を見つけられないため (sr-kai/claudeusagewin と同じ理由)。
+        // Run via cmd.exe /c. A bare "claude" fails because CreateProcess ignores PATHEXT and
+        // can't find the npm .cmd shim (same reason as sr-kai/claudeusagewin).
         var version = TryRunAndExtractVersion("cmd.exe", "/c claude --version");
         _cachedVersion = version ?? FallbackVersion;
         Debug.WriteLine($"Claude Code version resolved to: {_cachedVersion}");
@@ -131,7 +131,7 @@ internal static class UsageApiService
             process.Start();
             var output = process.StandardOutput.ReadToEnd();
             process.WaitForExit(5000);
-            // "2.1.143 (Claude Code)" などから最初の x.y(.z) を抜く。
+            // Extract the first x.y(.z) from output like "2.1.143 (Claude Code)".
             var match = Regex.Match(output, @"\d+\.\d+(?:\.\d+)*");
             return match.Success ? match.Value : null;
         }

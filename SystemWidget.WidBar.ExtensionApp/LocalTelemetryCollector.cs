@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Diagnostics;
 using Microsoft.Win32;
 using SystemWidget.WidBar.ExtensionApp.Models;
@@ -7,7 +6,7 @@ using SystemWidget.WidBar.ExtensionApp.Services;
 
 namespace SystemWidget.WidBar.ExtensionApp;
 
-/// <summary>WidBar 自身が使うローカル計測器。データを外部送信しない。</summary>
+/// <summary>Local collector used by the widget itself. Never sends data anywhere.</summary>
 internal sealed class LocalTelemetryCollector
 {
     private FILETIME _idle, _kernel, _user;
@@ -15,14 +14,14 @@ internal sealed class LocalTelemetryCollector
     private List<PerformanceCounter>? _gpuCounters;
     private List<PerformanceCounter>? _vramCounters;
     private int _emptyGpuSamples;
-    // Claude usage は 180 秒に 1 回、背景で更新して最終値を同期取得する。
-    // 毎秒 Sample() から呼ばれるため、ここで直接 HTTP を叩くと 429 に落ちる。
+    // Claude usage is refreshed in the background once every 180 seconds and the latest value is read synchronously.
+    // Sample() runs every second, so calling the HTTP API directly here would hit 429s.
     private readonly ClaudeUsageTracker _claudeTracker = new();
-    // DXGI は実機で RX 9070 XT の専用VRAM 15.8GB を返すことを単体検証済み。
-    // 取得不能時も GPU 使用率の収集は継続する。
+    // DXGI was verified on real hardware to return 15.8 GB of dedicated VRAM for an RX 9070 XT.
+    // GPU utilisation collection continues even if this can't be read.
     private readonly double _vramTotalGb = ReadDxgiVramBytes() / 1073741824d;
 
-    public MainPlugin.Snapshot Sample()
+    public MainPlugin.Snapshot Sample(bool includeGpu, bool includeClaude)
     {
         var memory = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
         GlobalMemoryStatusEx(ref memory);
@@ -48,18 +47,17 @@ internal sealed class LocalTelemetryCollector
                 MemoryUsedGb = (memory.ullTotalPhys - memory.ullAvailPhys) / 1073741824d,
                 MemoryTotalGb = totalGb,
             },
-            Codex = ReadCodex(),
-            Gpu = ReadGpu(),
-            Claude = ReadClaude(),
+            Gpu = includeGpu ? ReadGpu() : null,
+            Claude = includeClaude ? ReadClaude() : null,
         };
     }
 
     private MainPlugin.ClaudeStatus? ReadClaude()
     {
-        // credentials 自体が無いユーザは "--" 表示 (Claude Code 未ログイン等)。
+        // Users with no credentials at all (e.g. not logged in to Claude Code) see "--".
         if (!_claudeTracker.CredentialsExist) return null;
 
-        // 背景で 180 秒キャッシュを更新。初回は latest が null なので --。
+        // Refreshes the 180-second cache in the background. Latest is null on the first call, so "--".
         _claudeTracker.EnsureFresh();
         var usage = _claudeTracker.Latest;
         if (usage == null) return null;
@@ -70,6 +68,9 @@ internal sealed class LocalTelemetryCollector
             WeekPercent = usage.SevenDay?.Utilization,
             SessionSecondsRemaining = RemainingSeconds(usage.FiveHour?.ResetsAt),
             WeekSecondsRemaining = RemainingSeconds(usage.SevenDay?.ResetsAt),
+            SessionResetsAt = usage.FiveHour?.ResetsAt,
+            WeekResetsAt = usage.SevenDay?.ResetsAt,
+            FetchedAt = _claudeTracker.LatestFetchedAt,
         };
     }
 
@@ -88,7 +89,7 @@ internal sealed class LocalTelemetryCollector
         var bytes = ReadCounterSum(_vramCounters, out var memoryHits);
         if (utilHits == 0 && memoryHits == 0)
         {
-            // 終了済みプロセスのカウンターを抱え続けない。3回連続だけ再列挙する。
+            // Don't hold on to counters for exited processes. Re-enumerate after 3 consecutive empty samples.
             if (++_emptyGpuSamples >= 3)
             {
                 DisposeCounters(_gpuCounters); DisposeCounters(_vramCounters);
@@ -120,7 +121,7 @@ internal sealed class LocalTelemetryCollector
                 {
                     var enumAdapters = GetDelegate<EnumAdapters1>(factory, 12);
                     if (enumAdapters(factory, i, out var adapter) < 0) break;
-                    // IDXGIAdapter1::GetDesc1 は vtable の 11 番目。10 は CheckInterfaceSupport。
+                    // IDXGIAdapter1::GetDesc1 is vtable slot 11. Slot 10 is CheckInterfaceSupport.
                     try { var getDesc = GetDelegate<GetDesc1>(adapter, 11); if (getDesc(adapter, out var desc) >= 0) best = Math.Max(best, desc.DedicatedVideoMemory); }
                     finally { Marshal.Release(adapter); }
                 }
@@ -167,81 +168,6 @@ internal sealed class LocalTelemetryCollector
         if (counters is null) return;
         foreach (var counter in counters) counter.Dispose();
     }
-
-    // 週次判定のしきい値。Codex の週次枠は window_minutes=10080 (7日)。
-    private const long WeekWindowThresholdMinutes = 1440;
-
-    private static MainPlugin.CodexStatus? ReadCodex()
-    {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "sessions");
-        if (!Directory.Exists(root)) return null;
-        DateTimeOffset? newest = null;
-        double? shortUsed = null, weekUsed = null;
-        long? shortReset = null, weekReset = null;
-        try
-        {
-            foreach (var path in Directory.EnumerateFiles(root, "rollout-*.jsonl", SearchOption.AllDirectories)
-                         .Where(p => File.GetLastWriteTimeUtc(p) >= DateTime.UtcNow.AddHours(-48)))
-            {
-                // Codex が書き込み中のファイルや壊れた過去ログがあっても、
-                // 他セッションの正しい token_count を捨てない。
-                try
-                {
-                    // アクティブセッションのファイルは Codex 自身が書き込み用に開いたままなので、
-                    // File.ReadLines 既定の FileShare.Read だけでは共有違反 (IOException) になる。
-                    // 書き込み共有も許可して開かないと、直近のセッションの値を一切拾えない。
-                    foreach (var line in ReadLinesShared(path))
-                    {
-                        if (!line.Contains("\"rate_limits\"")) continue;
-                        using var doc = JsonDocument.Parse(line);
-                        var rootEl = doc.RootElement;
-                        if (!rootEl.TryGetProperty("timestamp", out var time) || !DateTimeOffset.TryParse(time.GetString(), out var ts)) continue;
-                        if (newest is { } previous && ts <= previous) continue;
-                        if (!rootEl.TryGetProperty("payload", out var payload) || !payload.TryGetProperty("type", out var type) || type.GetString() != "token_count" || !payload.TryGetProperty("rate_limits", out var limits)) continue;
-                        newest = ts;
-                        // "primary"/"secondary" は短期/週次のどちらに対応するかがプラン次第で入れ替わるため、
-                        // window_minutes の実値 (週次=10080分/7日) で振り分ける。名前を信用しない。
-                        (shortUsed, shortReset, weekUsed, weekReset) = AssignWindows(ReadWindow(limits, "primary"), ReadWindow(limits, "secondary"));
-                    }
-                }
-                catch (Exception) { }
-            }
-        }
-        catch (Exception) { return null; }
-        if (newest is null) return null;
-        return new MainPlugin.CodexStatus { ShortPercent = shortUsed, WeekPercent = weekUsed, ShortSecondsRemaining = SecondsRemaining(shortReset), WeekSecondsRemaining = SecondsRemaining(weekReset) };
-    }
-
-    private static (double? shortUsed, long? shortReset, double? weekUsed, long? weekReset) AssignWindows(
-        (double? used, long? reset, long? windowMinutes) a, (double? used, long? reset, long? windowMinutes) b)
-    {
-        if (a.windowMinutes is { } aw && b.windowMinutes is { } bw)
-            return aw >= bw ? (b.used, b.reset, a.used, a.reset) : (a.used, a.reset, b.used, b.reset);
-        if (a.windowMinutes is { } aw2)
-            return aw2 >= WeekWindowThresholdMinutes ? (b.used, b.reset, a.used, a.reset) : (a.used, a.reset, b.used, b.reset);
-        if (b.windowMinutes is { } bw2)
-            return bw2 >= WeekWindowThresholdMinutes ? (a.used, a.reset, b.used, b.reset) : (b.used, b.reset, a.used, a.reset);
-        // window_minutes が両方取れない場合は素直に primary=短期, secondary=週次 にフォールバック
-        return (a.used, a.reset, b.used, b.reset);
-    }
-
-    private static IEnumerable<string> ReadLinesShared(string path)
-    {
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        using var reader = new StreamReader(stream);
-        string? line;
-        while ((line = reader.ReadLine()) is not null) yield return line;
-    }
-
-    private static (double? used, long? reset, long? windowMinutes) ReadWindow(JsonElement limits, string name)
-    {
-        if (!limits.TryGetProperty(name, out var window) || window.ValueKind != JsonValueKind.Object) return (null, null, null);
-        return (window.TryGetProperty("used_percent", out var used) ? used.GetDouble() : null,
-                window.TryGetProperty("resets_at", out var reset) ? reset.GetInt64() : null,
-                window.TryGetProperty("window_minutes", out var wm) ? wm.GetInt64() : null);
-    }
-
-    private static int? SecondsRemaining(long? epoch) => epoch is null ? null : Math.Max(0, (int)(DateTimeOffset.FromUnixTimeSeconds(epoch.Value) - DateTimeOffset.UtcNow).TotalSeconds);
 
     private static ulong AsUInt64(FILETIME value) => ((ulong)value.dwHighDateTime << 32) | value.dwLowDateTime;
     [StructLayout(LayoutKind.Sequential)] private struct FILETIME { public uint dwLowDateTime, dwHighDateTime; }

@@ -4,18 +4,18 @@ using SystemWidget.WidBar.ExtensionApp.Models;
 namespace SystemWidget.WidBar.ExtensionApp.Services;
 
 /// <summary>
-/// <see cref="UsageApiService"/> の結果を 180 秒キャッシュし、同期の
-/// <see cref="LocalTelemetryCollector.Sample"/> から常に即時読み取れるようにする。
+/// Caches <see cref="UsageApiService"/> results for 180 seconds so the synchronous
+/// <see cref="LocalTelemetryCollector.Sample"/> can always read them immediately.
 ///
-/// <para>API を毎秒叩くと 429 バケット行きになるため、fire-and-forget の背景タスクで
-/// リフレッシュし、UI 側は最終取得値を返し続ける。初回取得までは null。</para>
+/// <para>Calling the API every second lands you in the 429 bucket, so refreshes run as a
+/// fire-and-forget background task and the UI keeps getting the last value. Null until the first fetch.</para>
 /// </summary>
 internal sealed class ClaudeUsageTracker
 {
-    // Anthropic の非公式エンドポイントは 180 秒 / 呼び出し以上を推奨 (429 issue の多くがそれ未満)。
+    // At least 180 seconds per call is recommended for Anthropic's unofficial endpoint (most 429 reports poll faster).
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(180);
 
-    // 直近失敗時のクールダウン。連続失敗で API に負荷を掛けない。
+    // Cooldown after a failure, so repeated failures don't hammer the API.
     private static readonly TimeSpan FailureCooldown = TimeSpan.FromSeconds(60);
 
     private UsageData? _latest;
@@ -23,15 +23,18 @@ internal sealed class ClaudeUsageTracker
     private DateTime _lastAttemptUtc = DateTime.MinValue;
     private int _refreshInFlight;
 
-    /// <summary>最後に取得できた usage。まだ一度も取れていなければ null。</summary>
+    /// <summary>The last usage successfully fetched, or null if none has been fetched yet.</summary>
     public UsageData? Latest => _latest;
 
-    /// <summary>credentials が読める状態にあるかを sync でチェック (Preview UI 側の "--" 判定用)。</summary>
+    /// <summary>When <see cref="Latest"/> was fetched. Changes only when a new fetch succeeds.</summary>
+    public DateTimeOffset? LatestFetchedAt { get; private set; }
+
+    /// <summary>Synchronously checks whether credentials are readable (used by the preview UI to decide on "--").</summary>
     public bool CredentialsExist => CredentialService.CredentialsExist();
 
     /// <summary>
-    /// 必要なら背景で再取得を仕込む。呼び出し自体は即戻る (fire-and-forget)。
-    /// 前回成功から 180 秒経ってなければ何もしない。
+    /// Kicks off a background refresh if needed. The call itself returns immediately (fire-and-forget).
+    /// Does nothing if less than 180 seconds have passed since the last success.
     /// </summary>
     public void EnsureFresh()
     {
@@ -42,7 +45,7 @@ internal sealed class ClaudeUsageTracker
         if (_latest != null && sinceSuccess < RefreshInterval) return;
         if (sinceAttempt < FailureCooldown && _latest != null) return;
 
-        // 二重起動防止。既に走ってるなら乗らない。
+        // Prevent concurrent refreshes. If one is already running, don't start another.
         if (Interlocked.CompareExchange(ref _refreshInFlight, 1, 0) != 0) return;
 
         _lastAttemptUtc = now;
@@ -56,8 +59,9 @@ internal sealed class ClaudeUsageTracker
                 {
                     _latest = data;
                     _lastSuccessUtc = DateTime.UtcNow;
+                    LatestFetchedAt = DateTimeOffset.UtcNow;
                 }
-                // 失敗時は _latest を消さない (画面が突然 "--" にならないように)。
+                // Keep _latest on failure (so the display doesn't suddenly drop to "--").
             }
             catch (Exception ex)
             {

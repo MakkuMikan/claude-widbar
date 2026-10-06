@@ -7,24 +7,24 @@ using SystemWidget.WidBar.ExtensionApp.Models;
 namespace SystemWidget.WidBar.ExtensionApp.Services;
 
 /// <summary>
-/// Claude Code の OAuth 資格情報を読み、必要なら refresh token で access token を更新する。
+/// Reads Claude Code's OAuth credentials and, if needed, renews the access token using the refresh token.
 ///
-/// <para>安全方針 — Claude Code 本体のファイル (<c>~/.claude/.credentials.json</c>) には
-/// 書き込まない。更新した token はウィジェット専用キャッシュ
-/// (<c>%LOCALAPPDATA%\system_widget\claude_token.json</c>) に保存し、次回以降はキャッシュ側を優先する。</para>
+/// <para>Safety policy: never write to Claude Code's own file (<c>~/.claude/.credentials.json</c>).
+/// Refreshed tokens are saved to a widget-only cache
+/// (<c>%LOCALAPPDATA%\system_widget\claude_token.json</c>), which is preferred from then on.</para>
 ///
-/// <para>これは Python 版 (<c>monitors/claude_api.py</c>) と同じポリシー。デスクトップ版 CC が
-/// credentials.json を触らなくなっても、ウィジェット側は自前で token を回せる。</para>
+/// <para>This is the same policy as the Python version (<c>monitors/claude_api.py</c>). Even if desktop
+/// Claude Code stops updating credentials.json, the widget can keep its own token rotating.</para>
 /// </summary>
 internal static class CredentialService
 {
     private static readonly HttpClient _httpClient = new();
     private const string TokenRefreshUrl = "https://console.anthropic.com/v1/oauth/token";
 
-    // Expiry buffer: 残りこれ未満なら refresh を試みる (Claude Code の使用中に切れないよう余裕を持つ)
+    // Expiry buffer: try a refresh when less than this remains (leaves headroom so it doesn't expire mid-use)
     private static readonly TimeSpan ExpiryBuffer = TimeSpan.FromMinutes(5);
 
-    // refresh token 失効 (400/401/403) 後の再試行抑止。人間の再ログインが必要なので頻繁に叩かない。
+    // Suppress retries after the refresh token dies (400/401/403). A human has to log in again, so don't retry often.
     private static readonly TimeSpan RefreshDeadRetryInterval = TimeSpan.FromHours(1);
     private static DateTime _refreshDeadUntil = DateTime.MinValue;
 
@@ -39,9 +39,9 @@ internal static class CredentialService
         "claude_token.json");
 
     /// <summary>
-    /// 使用可能な access token を返す。取れなければ null。
-    /// 優先順: (1) CC ファイルの有効な token → (2) widget キャッシュの有効な token
-    /// → (3) refresh token で再取得 (キャッシュ側 refresh を優先)。
+    /// Returns a usable access token, or null if none can be obtained.
+    /// Order: (1) a valid token in Claude Code's file, (2) a valid token in the widget cache,
+    /// (3) a fresh token from the refresh token (preferring the cache's refresh token).
     /// </summary>
     public static async Task<string?> GetAccessTokenAsync()
     {
@@ -79,7 +79,7 @@ internal static class CredentialService
         }
     }
 
-    /// <summary>credentials.json が存在するかを sync でチェック (UI 側の可用性表示用)。</summary>
+    /// <summary>Synchronously checks whether credentials.json exists (used by the UI to show availability).</summary>
     public static bool CredentialsExist() =>
         File.Exists(GetClaudeCredentialsPath()) || File.Exists(GetWidgetCachePath());
 
@@ -163,7 +163,7 @@ internal static class CredentialService
             var payload = new CredentialsFile { ClaudeAiOauth = oauth };
             var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = false });
 
-            // 途中書き込みを他プロセスに見せないよう temp + replace で原子化する。
+            // Write to a temp file and replace, so other processes never see a partial write.
             var tmp = path + ".tmp";
             File.WriteAllText(tmp, json);
             File.Move(tmp, path, overwrite: true);

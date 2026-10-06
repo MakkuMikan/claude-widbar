@@ -23,11 +23,11 @@
   <PropertyGroup>
     <WidBarPluginId>io.github.10tonchan.claudecodexwidbar</WidBarPluginId>
     <WidBarPluginName>System Widget</WidBarPluginName>
-    <WidBarPluginDescription>CPU、GPU、Claude Code の使用状況をタスクバーに表示</WidBarPluginDescription>
+    <WidBarPluginDescription>Shows CPU, GPU and Claude Code usage on the taskbar</WidBarPluginDescription>
     <WidBarPluginCategory>Utility</WidBarPluginCategory>
     <WidBarPluginVersion>1.0.7</WidBarPluginVersion>
-    <WidBarPluginPreviewWidth>456</WidBarPluginPreviewWidth>
-    <WidBarPluginConfigurable>false</WidBarPluginConfigurable>
+    <WidBarPluginPreviewWidth>152</WidBarPluginPreviewWidth>
+    <WidBarPluginConfigurable>true</WidBarPluginConfigurable>
   </PropertyGroup>
 
   <ItemGroup>
