@@ -1,5 +1,13 @@
 # System Widget for WidBar
 
+> **About this fork**: This is a fork of [10tonchan/claude-codex-widbar](https://github.com/10tonchan/claude-codex-widbar). It differs from the original in that:
+>
+> - Codex support has been removed.
+> - Each stat can be shown or hidden from the widget's settings. By default only the two Claude Code tiles are shown, so the widget fits in narrower taskbar gaps.
+> - The taskbar strip sits on a rounded card.
+> - The Claude Code lines span the whole 5-hour or weekly window, and the flyout adds a chart for each window with a projection of usage at reset.
+> - The code and UI are in English only.
+
 A [WidBar](https://github.com/andelby/widbar) widget for the Windows taskbar that shows local CPU, RAM, GPU, VRAM, and Claude Code usage.
 
 This directory is meant to publish **source code only**. No MSIX binaries, certificates, credentials, or usage logs are included.
