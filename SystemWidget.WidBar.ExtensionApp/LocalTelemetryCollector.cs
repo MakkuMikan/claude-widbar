@@ -16,7 +16,7 @@ internal sealed class LocalTelemetryCollector
     private int _emptyGpuSamples;
     // Claude usage is refreshed in the background once every 180 seconds and the latest value is read synchronously.
     // Sample() runs every second, so calling the HTTP API directly here would hit 429s.
-    private readonly ClaudeUsageTracker _claudeTracker = new();
+    private readonly ClaudeUsageTracker _claudeTracker = ClaudeUsageTracker.Shared;
     // DXGI was verified on real hardware to return 15.8 GB of dedicated VRAM for an RX 9070 XT.
     // GPU utilisation collection continues even if this can't be read.
     private readonly double _vramTotalGb = ReadDxgiVramBytes() / 1073741824d;
@@ -59,8 +59,8 @@ internal sealed class LocalTelemetryCollector
 
         // Refreshes the 180-second cache in the background. Latest is null on the first call, so "--".
         _claudeTracker.EnsureFresh();
-        var usage = _claudeTracker.Latest;
-        if (usage == null) return null;
+        if (_claudeTracker.Latest is not { } fetch) return null;
+        var usage = fetch.Data;
 
         return new MainPlugin.ClaudeStatus
         {
@@ -70,7 +70,7 @@ internal sealed class LocalTelemetryCollector
             WeekSecondsRemaining = RemainingSeconds(usage.SevenDay?.ResetsAt),
             SessionResetsAt = usage.FiveHour?.ResetsAt,
             WeekResetsAt = usage.SevenDay?.ResetsAt,
-            FetchedAt = _claudeTracker.LatestFetchedAt,
+            FetchedAt = fetch.FetchedAt,
         };
     }
 
